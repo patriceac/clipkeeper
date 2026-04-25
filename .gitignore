@@ -1,0 +1,17 @@
+*.iml
+.gradle/
+.idea/
+build/
+captures/
+local.properties
+*/build/
+*.jks
+*.keystore
+keystore.properties
+release-secrets/
+play-release/
+/*.png
+/*.xml
+*.aab
+*.apks
+*.apk
