@@ -59,6 +59,10 @@ class MainActivity : ComponentActivity() {
                     onHideSaveSheet = viewModel::hideSaveSheet,
                     onSaveDraftChange = viewModel::updateSaveDraft,
                     onSaveDraft = viewModel::saveDraftText,
+                    onShowEditSheet = viewModel::showEditSheet,
+                    onHideEditSheet = viewModel::hideEditSheet,
+                    onEditDraftChange = viewModel::updateEditDraft,
+                    onSaveEdit = viewModel::saveEditedText,
                     onSaveCurrentClipboard = {
                         viewModel.saveCurrentClipboard(clipboardManager.primaryClip)
                     },

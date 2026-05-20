@@ -60,6 +60,36 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `edit text preloads existing content and updates saved item`() = runTest(dispatcher) {
+        val originalEntry = ClipEntry(
+            id = 7L,
+            kind = ClipContentKind.TEXT,
+            createdAt = 1L,
+            text = "First line\nSecond line\nFull stored text",
+        )
+        val repository = FakeClipboardRepository(initialEntries = listOf(originalEntry))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository())
+        val collectJob = backgroundScope.launch { viewModel.uiState.collect {} }
+
+        viewModel.showEditSheet(originalEntry)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.editSheetVisible)
+        assertEquals(originalEntry.text, viewModel.uiState.value.editDraft)
+
+        viewModel.updateEditDraft("Updated full text")
+        viewModel.saveEditedText()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.editSheetVisible)
+        assertEquals("", viewModel.uiState.value.editDraft)
+        assertEquals("Updated in ClipKeeper", viewModel.uiState.value.noticeMessage)
+        assertTrue(viewModel.uiState.value.clips.any { it.id == 7L && it.text == "Updated full text" })
+
+        collectJob.cancel()
+    }
+
+    @Test
     fun `import shared text focuses saved items and stores the clip`() = runTest(dispatcher) {
         val repository = FakeClipboardRepository(
             initialEntries = listOf(
@@ -146,6 +176,21 @@ private class FakeClipboardRepository(
         )
         entries.value = listOf(entry) + entries.value
         return entry
+    }
+
+    override suspend fun updateText(
+        id: Long,
+        text: String,
+    ): ClipEntry? {
+        var updatedEntry: ClipEntry? = null
+        entries.value = entries.value.map { clip ->
+            if (clip.id == id && clip.kind == ClipContentKind.TEXT) {
+                clip.copy(text = text).also { updatedEntry = it }
+            } else {
+                clip
+            }
+        }
+        return updatedEntry
     }
 
     override suspend fun saveExplicitClip(

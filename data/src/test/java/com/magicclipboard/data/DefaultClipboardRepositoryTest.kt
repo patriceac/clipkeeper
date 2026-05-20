@@ -10,6 +10,7 @@ import com.magicclipboard.data.model.ClipContentKind
 import com.magicclipboard.data.security.PayloadCipher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -70,6 +71,27 @@ class DefaultClipboardRepositoryTest {
         assertTrue(pinnedImage.exists())
         assertNotNull(dao.getById(3L))
         assertTrue(freshImage.exists())
+    }
+
+    @Test
+    fun `update text replaces stored text for text clips`() = runTest {
+        val saved = repository.saveText("Original text")
+
+        val updated = repository.updateText(saved!!.id, "Edited text")
+
+        assertNotNull(updated)
+        assertEquals("Edited text", updated!!.text)
+        assertEquals("Edited text", dao.getById(saved.id)?.encryptedText)
+    }
+
+    @Test
+    fun `update text ignores image clips`() = runTest {
+        dao.insert(imageClip(id = 12L, createdAt = System.currentTimeMillis(), storagePath = imageFile("image.mcbin").absolutePath))
+
+        val updated = repository.updateText(12L, "Should not apply")
+
+        assertNull(updated)
+        assertNull(dao.getById(12L)?.encryptedText)
     }
 
     private fun imageFile(name: String): File =

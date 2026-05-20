@@ -21,6 +21,21 @@ interface ClipDao {
     @Query(
         """
         UPDATE clips
+        SET encryptedText = :encryptedText,
+            createdAt = :updatedAt
+        WHERE id = :id AND kind = :kind
+        """,
+    )
+    suspend fun updateText(
+        id: Long,
+        kind: String,
+        encryptedText: String,
+        updatedAt: Long,
+    ): Int
+
+    @Query(
+        """
+        UPDATE clips
         SET isPinned = NOT isPinned,
             createdAt = CASE WHEN isPinned = 1 THEN :updatedAt ELSE createdAt END
         WHERE id = :id

@@ -43,6 +43,23 @@ class DefaultClipboardRepository(
         persistText(normalizedText, sourcePackage)
     }
 
+    override suspend fun updateText(
+        id: Long,
+        text: String,
+    ): ClipEntry? = withContext(Dispatchers.IO) {
+        if (text.isBlank()) return@withContext null
+
+        val updatedRows = clipDao.updateText(
+            id = id,
+            kind = ClipContentKind.TEXT.name,
+            encryptedText = payloadCipher.encryptText(text),
+            updatedAt = System.currentTimeMillis(),
+        )
+        if (updatedRows == 0) return@withContext null
+
+        clipDao.getById(id)?.let(::toModel)
+    }
+
     override suspend fun saveExplicitClip(
         clipData: ClipData?,
         sourcePackage: String?,

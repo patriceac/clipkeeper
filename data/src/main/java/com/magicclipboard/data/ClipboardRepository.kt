@@ -14,6 +14,11 @@ interface ClipboardRepository {
         sourcePackage: String? = null,
     ): ClipEntry?
 
+    suspend fun updateText(
+        id: Long,
+        text: String,
+    ): ClipEntry?
+
     suspend fun saveExplicitClip(
         clipData: ClipData?,
         sourcePackage: String? = null,

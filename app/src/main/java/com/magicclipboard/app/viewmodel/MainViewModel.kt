@@ -51,6 +51,8 @@ data class MainUiState(
     val selectedFilter: ScratchpadFilter = ScratchpadFilter.ALL,
     val saveSheetVisible: Boolean = false,
     val saveDraft: String = "",
+    val editSheetVisible: Boolean = false,
+    val editDraft: String = "",
     val foregroundClipboard: ClipboardPreview? = null,
     val pendingSharedPayload: PendingSharedPayload? = null,
     val noticeMessage: String? = null,
@@ -89,6 +91,11 @@ private data class MainFeedbackState(
     val noticeMessage: String?,
 )
 
+private data class MainEditState(
+    val editingEntryId: Long?,
+    val draft: String,
+)
+
 @HiltViewModel
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel @Inject constructor(
@@ -100,6 +107,8 @@ class MainViewModel @Inject constructor(
     private val selectedFilter = MutableStateFlow(ScratchpadFilter.ALL)
     private val saveSheetVisible = MutableStateFlow(false)
     private val saveDraft = MutableStateFlow("")
+    private val editingEntryId = MutableStateFlow<Long?>(null)
+    private val editDraft = MutableStateFlow("")
     private val foregroundClipboard = MutableStateFlow<ClipboardPreview?>(null)
     private val pendingSharedRequest = MutableStateFlow<SharedSaveRequest?>(null)
     private val noticeMessage = MutableStateFlow<String?>(null)
@@ -142,12 +151,23 @@ class MainViewModel @Inject constructor(
         )
     }
 
+    private val editState = combine(
+        editingEntryId,
+        editDraft,
+    ) { entryId, draft ->
+        MainEditState(
+            editingEntryId = entryId,
+            draft = draft,
+        )
+    }
+
     val uiState: StateFlow<MainUiState> = combine(
         settings,
         clips,
         controlsState,
         feedbackState,
-    ) { appSettings, clipEntries, controls, feedback ->
+        editState,
+    ) { appSettings, clipEntries, controls, feedback, edit ->
         MainUiState(
             settings = appSettings,
             clips = clipEntries,
@@ -156,6 +176,8 @@ class MainViewModel @Inject constructor(
             selectedFilter = controls.selectedFilter,
             saveSheetVisible = controls.saveSheetVisible,
             saveDraft = controls.saveDraft,
+            editSheetVisible = edit.editingEntryId != null,
+            editDraft = edit.draft,
             foregroundClipboard = feedback.foregroundClipboard,
             pendingSharedPayload = feedback.pendingSharedPayload,
             noticeMessage = feedback.noticeMessage,
@@ -192,6 +214,21 @@ class MainViewModel @Inject constructor(
 
     fun updateSaveDraft(text: String) {
         saveDraft.value = text
+    }
+
+    fun showEditSheet(clip: ClipEntry) {
+        if (clip.kind != ClipContentKind.TEXT) return
+        editingEntryId.value = clip.id
+        editDraft.value = clip.text.orEmpty()
+    }
+
+    fun hideEditSheet() {
+        editingEntryId.value = null
+        editDraft.value = ""
+    }
+
+    fun updateEditDraft(text: String) {
+        editDraft.value = text
     }
 
     fun setForegroundClipboardPreview(preview: ClipboardPreview?) {
@@ -235,6 +272,22 @@ class MainViewModel @Inject constructor(
                 noticeMessage.value = "Saved to ClipKeeper"
             } else {
                 noticeMessage.value = "Nothing was saved"
+            }
+        }
+    }
+
+    fun saveEditedText() {
+        val entryId = editingEntryId.value ?: return
+        val draft = editDraft.value
+        if (draft.isBlank()) return
+
+        viewModelScope.launch {
+            val updated = clipboardRepository.updateText(entryId, draft)
+            if (updated != null) {
+                hideEditSheet()
+                noticeMessage.value = "Updated in ClipKeeper"
+            } else {
+                noticeMessage.value = "That text item could not be updated"
             }
         }
     }

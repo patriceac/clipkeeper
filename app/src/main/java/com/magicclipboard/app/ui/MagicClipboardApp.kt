@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -121,6 +122,10 @@ fun MagicClipboardApp(
     onHideSaveSheet: () -> Unit,
     onSaveDraftChange: (String) -> Unit,
     onSaveDraft: () -> Unit,
+    onShowEditSheet: (ClipEntry) -> Unit,
+    onHideEditSheet: () -> Unit,
+    onEditDraftChange: (String) -> Unit,
+    onSaveEdit: () -> Unit,
     onSaveCurrentClipboard: () -> Unit,
     onCopyClip: (ClipEntry) -> Unit,
     onShareClip: (ClipEntry) -> Unit,
@@ -223,6 +228,7 @@ fun MagicClipboardApp(
                         onClearAll = onClearAll,
                         onCopyClip = onCopyClip,
                         onShareClip = onShareClip,
+                        onEditClip = onShowEditSheet,
                         loadBitmap = loadBitmap,
                     )
                     MainTab.SETTINGS -> SettingsScreen(
@@ -246,6 +252,15 @@ fun MagicClipboardApp(
             onDraftChange = onSaveDraftChange,
             onSaveDraft = onSaveDraft,
             onSaveCurrentClipboard = onSaveCurrentClipboard,
+        )
+    }
+
+    if (state.editSheetVisible) {
+        EditTextSheet(
+            draft = state.editDraft,
+            onDismiss = onHideEditSheet,
+            onDraftChange = onEditDraftChange,
+            onSave = onSaveEdit,
         )
     }
 
@@ -273,6 +288,7 @@ private fun ScratchpadScreen(
     onClearAll: () -> Unit,
     onCopyClip: (ClipEntry) -> Unit,
     onShareClip: (ClipEntry) -> Unit,
+    onEditClip: (ClipEntry) -> Unit,
     loadBitmap: suspend (Long) -> Bitmap?,
 ) {
     val filteredClips = remember(state.clips, state.selectedFilter) {
@@ -378,6 +394,7 @@ private fun ScratchpadScreen(
                             onDelete = { onDeleteEntry(clip.id) },
                             onCopy = { onCopyClip(clip) },
                             onShare = { onShareClip(clip) },
+                            onEdit = { onEditClip(clip) },
                             loadBitmap = loadBitmap,
                         )
                     }
@@ -400,6 +417,7 @@ private fun ScratchpadScreen(
                             onDelete = { onDeleteEntry(clip.id) },
                             onCopy = { onCopyClip(clip) },
                             onShare = { onShareClip(clip) },
+                            onEdit = { onEditClip(clip) },
                             loadBitmap = loadBitmap,
                         )
                     }
@@ -517,6 +535,7 @@ private fun ClipCard(
     onDelete: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
+    onEdit: () -> Unit,
     loadBitmap: suspend (Long) -> Bitmap?,
 ) {
     Card(
@@ -653,6 +672,21 @@ private fun ClipCard(
             ) {
                 if (clip.kind == ClipContentKind.TEXT && !clip.text.isNullOrBlank()) {
                     OutlinedButton(
+                        onClick = onEdit,
+                        shape = ControlShape,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.EditNote,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text("Edit")
+                    }
+                    OutlinedButton(
                         onClick = onCopy,
                         shape = ControlShape,
                         colors = ButtonDefaults.outlinedButtonColors(
@@ -682,6 +716,71 @@ private fun ClipCard(
                     )
                     Spacer(modifier = Modifier.size(8.dp))
                     Text("Share")
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditTextSheet(
+    draft: String,
+    onDismiss: () -> Unit,
+    onDraftChange: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = "Edit text",
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "The full saved text is ready to review and update.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = draft,
+                onValueChange = onDraftChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 220.dp, max = 420.dp),
+                minLines = 8,
+                maxLines = 18,
+                shape = ControlShape,
+                label = { Text("Saved text") },
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = ControlShape,
+                ) {
+                    Text("Cancel")
+                }
+                Button(
+                    onClick = onSave,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    enabled = draft.isNotBlank(),
+                    shape = ControlShape,
+                ) {
+                    Text("Save changes")
                 }
             }
         }
