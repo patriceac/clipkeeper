@@ -186,7 +186,7 @@ class MainViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            settings.collect { appSettings ->
+            settingsRepository.settings.collect { appSettings ->
                 clipboardRepository.pruneExpired(appSettings.retentionHours)
             }
         }

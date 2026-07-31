@@ -10,6 +10,7 @@ import com.magicclipboard.data.prefs.SettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -146,6 +147,21 @@ class MainViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun `startup cleanup waits for persisted retention setting`() = runTest(dispatcher) {
+        val repository = FakeClipboardRepository()
+        val settingsRepository = DelayedSettingsRepository()
+        MainViewModel(repository, settingsRepository)
+        advanceUntilIdle()
+
+        assertTrue(repository.prunedRetentionHours.isEmpty())
+
+        settingsRepository.emit(AppSettings(retentionHours = 168))
+        advanceUntilIdle()
+
+        assertEquals(listOf(168), repository.prunedRetentionHours)
+    }
 }
 
 private class FakeClipboardRepository(
@@ -153,6 +169,7 @@ private class FakeClipboardRepository(
 ) : ClipboardRepository {
     private val entries = MutableStateFlow(initialEntries)
     private var nextId = (initialEntries.maxOfOrNull(ClipEntry::id) ?: 0L) + 1L
+    val prunedRetentionHours = mutableListOf<Int>()
 
     override fun observeEntries(query: String): Flow<List<ClipEntry>> {
         val normalizedQuery = query.trim().lowercase()
@@ -218,7 +235,9 @@ private class FakeClipboardRepository(
         entries.value = emptyList()
     }
 
-    override suspend fun pruneExpired(retentionHours: Int) = Unit
+    override suspend fun pruneExpired(retentionHours: Int) {
+        prunedRetentionHours += retentionHours
+    }
 
     override suspend fun loadImagePreview(id: Long) = null
 
@@ -227,7 +246,6 @@ private class FakeClipboardRepository(
 
 private class FakeSettingsRepository : SettingsRepository {
     private val mutableSettings = MutableStateFlow(AppSettings())
-
     override val settings: Flow<AppSettings> = mutableSettings
 
     override suspend fun setRetentionHours(hours: Int) {
@@ -241,4 +259,19 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setConfirmBeforeDelete(enabled: Boolean) {
         mutableSettings.value = mutableSettings.value.copy(confirmBeforeDelete = enabled)
     }
+}
+
+private class DelayedSettingsRepository : SettingsRepository {
+    private val mutableSettings = MutableSharedFlow<AppSettings>()
+    override val settings: Flow<AppSettings> = mutableSettings
+
+    suspend fun emit(settings: AppSettings) {
+        mutableSettings.emit(settings)
+    }
+
+    override suspend fun setRetentionHours(hours: Int) = Unit
+
+    override suspend fun setThemeMode(mode: ThemeMode) = Unit
+
+    override suspend fun setConfirmBeforeDelete(enabled: Boolean) = Unit
 }
